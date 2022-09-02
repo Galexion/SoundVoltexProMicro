@@ -1,13 +1,22 @@
-// Joystick - Version: Latest
+#include <ezButton.h>
 #include <Joystick.h>
-
 #include <Encoder.h>
 // Button Config
 #include "config.h"
 
-byte pinArray[7] = {START, BTA, BTB, BTC, BTD, FXL, FXR};
 byte ledArray[7] = {STARTLED, BTALED, BTBLED, BTCLED, BTDLED, FXLLED, FXRLED};
+long BTBACK = 0;
 
+ezButton buttonArray[] = {
+  ezButton(START),
+  ezButton(BTA),
+  ezButton(BTB),
+  ezButton(BTC),
+  ezButton(BTD),
+  ezButton(FXL),
+  ezButton(FXR),
+  ezButton(BTBACK)
+};
 // Encoders
 Encoder knobLeft(1, 0);
 Encoder knobRight(20, 21);
@@ -39,14 +48,16 @@ void setup() {
   Joystick.begin();
   Joystick.setXAxisRange(0, 255);
   Joystick.setYAxisRange(0, 255);
+  for (byte i = 0; i < 6; i++) {
+    buttonArray[i].setDebounceTime(13); // set debounce time to 50 milliseconds
+  }
+
 }
 
 long positionLeft  = -999;
 long positionRight = -999;
 
 // Last state of the buttons
-int currentState[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-int previousState[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
 void knobDriver() {
 
@@ -85,7 +96,7 @@ void knobDriver() {
     knobRight.write(0);
   }
 }
-
+int currentState[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 void ledDriver() {
   for (int count = 0; count < 7; count++) {
     int led = digitalRead(ledArray[count]);
@@ -102,30 +113,29 @@ void ledDriver() {
 void buttonDriver() {
   for (int count = 0; count < 7; count++) {
     //Serial.println("testing");
-    currentState[count] = !digitalRead(pinArray[count]);
-    if (currentState[0] == 1 && currentState[5] == 1 && currentState[6] == 1 && currentState[7] == 0) {
+    if (buttonArray[0].isPressed() && buttonArray[5].isPressed() && buttonArray[6].isPressed() && BTBACK == 0) {
       Joystick.setButton(7, 1);
       Serial.println("Combination BACK has been activated.");
-      currentState[7] = 1;
-    } else if (currentState[0] == 0 && currentState[5] == 0 && currentState[6] == 0 && currentState[7] == 1) {
+      BTBACK = 1;
+    } else if (buttonArray[0].isReleased() && buttonArray[5].isReleased() && buttonArray[6].isReleased() && BTBACK == 0) {
       Joystick.setButton(7, 0);
       Serial.println("Combination BACK has been deactivated.");
-      currentState[7] = 0;
+      BTBACK = 0;
     }
-    if (previousState[count] == 1 && currentState[count] == 0) {
+    if (buttonArray[count].isReleased()) {
       Joystick.setButton(count, 0);
-      // buttonRelease(firstDataArray[count], SeccondDataArray[count]);
-      previousState[count] = currentState[count];
-    } else if (previousState[count] == 0 && currentState[count] == 1) {
+      currentState[count] = 0;
+    } else if (buttonArray[count].isPressed()) {
       Joystick.setButton(count, 1);
-      // buttonPressed(firstDataArray[count], SeccondDataArray[count]);
-      previousState[count] = currentState[count];
+       currentState[count] = 1;
     //delay(40);
     }
   }
 }
 
 void loop() {
+  for (byte i = 0; i < 7; i++)
+    buttonArray[i].loop(); // MUST call the loop() function first
   //Knob stuff
   knobDriver();
   // buttons
